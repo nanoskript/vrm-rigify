@@ -73,3 +73,8 @@ only supports the VRM 0.x format.
 5. (Optional) Remove any objects that are no longer needed:
 
    <img src="docs/delete.png" width="384px">
+
+## License
+
+This addon is licensed under the MIT license. The VRM avatar pictured
+is [AvatarSample_A](https://hub.vroid.com/characters/2843975675147313744) belonging to VRoid.
