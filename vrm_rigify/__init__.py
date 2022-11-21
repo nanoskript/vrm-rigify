@@ -5,6 +5,8 @@ bl_info = {
     "version": (0, 1, 0),
     "blender": (2, 80, 0),
     "location": "Operator Search > VRM Rigify",
+    "doc_url": "https://github.com/Nanoskript/vrm-rigify",
+    "tracker_url": "https://github.com/Nanoskript/vrm-rigify/issues",
     "category": "Rigging",
 }
 
