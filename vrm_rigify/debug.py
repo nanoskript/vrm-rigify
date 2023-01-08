@@ -1,3 +1,11 @@
+import logging
+
+LOGGER = logging.getLogger("vrm_rigify")
+LOGGER.setLevel(logging.DEBUG)
+if not LOGGER.hasHandlers():
+    LOGGER.addHandler(logging.StreamHandler())
+
+
 def vroid_bone_types(vroid_rig):
     bones = []
     for bone in vroid_rig.data.bones:

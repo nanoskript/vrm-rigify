@@ -1,3 +1,5 @@
+from .debug import LOGGER
+
 TWEAK_LAYERS = [
     4,  # Torso
     9,  # Arm.L
@@ -16,4 +18,5 @@ def humanize(rig):
     for bone in rig.pose.bones:
         stretch_key = "IK_Stretch"
         if stretch_key in bone:
+            LOGGER.info(f"disabling stretching for '{bone.name}'")
             bone[stretch_key] = 0.0
