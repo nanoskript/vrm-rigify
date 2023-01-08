@@ -14,30 +14,25 @@ BASE_VROID_BONE_MAP = [
     ('hand', '^Hand'),
     ('eye', '^FaceEye_'),
     # Thumb finger.
-    # Ignore: Thumb1
-    ('thumb.01', '^Thumb2'),
-    ('thumb.02', '^Thumb3_[LR]$'),
-    ('thumb.03', '^Thumb3_end'),
+    ('thumb.01', '^Thumb1'),
+    ('thumb.02', '^Thumb2'),
+    ('thumb.03', '^Thumb3_[LR]$'),  # Ignore if exists: Thumb3_end
     # Index finger.
-    ('palm.01', '^Index1'),
-    ('index.01', '^Index2'),
-    ('index.02', '^Index3_[LR]$'),
-    ('index.03', '^Index3_end'),
+    ('index.01', '^Index1'),
+    ('index.02', '^Index2'),
+    ('index.03', '^Index3_[LR]$'),  # Ignore if exists: Index3_end
     # Middle finger.
-    ('palm.02', '^Middle1'),
-    ('middle.01', '^Middle2'),
-    ('middle.02', '^Middle3_[LR]$'),
-    ('middle.03', '^Middle3_end'),
+    ('middle.01', '^Middle1'),
+    ('middle.02', '^Middle2'),
+    ('middle.03', '^Middle3_[LR]$'),  # Ignore if exists: Middle3_end
     # Ring finger.
-    ('palm.03', '^Ring1'),
-    ('ring.01', '^Ring2'),
-    ('ring.02', '^Ring3_[LR]$'),
-    ('ring.03', '^Ring3_end'),
+    ('ring.01', '^Ring1'),
+    ('ring.02', '^Ring2'),
+    ('ring.03', '^Ring3_[LR]$'),  # Ignore if exists: Ring3_end
     # Little finger.
-    ('palm.04', '^Little1'),
-    ('pinky.01', '^Little2'),
-    ('pinky.02', '^Little3_[LR]$'),
-    ('pinky.03', '^Little3_end'),
+    ('pinky.01', '^Little1'),
+    ('pinky.02', '^Little2'),
+    ('pinky.03', '^Little3_[LR]$'),  # Ignore if exists: Little3_end
     # Spine.
     ('spine$', '^Hips'),
     ('spine.001', '^Spine'),
@@ -49,7 +44,6 @@ BASE_VROID_BONE_MAP = [
 
 BASE_IGNORED = [
     'spine.005',
-    'pelvis',
     # Unneeded facial features.
     # Expressions managed by shape keys.
     'forehead',

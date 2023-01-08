@@ -4,6 +4,14 @@ from .base import BASE_IGNORED, create_bone_mapping, objects_by_patterns
 from .debug import LOGGER
 from .other import editing
 
+BONES_DELETE = [
+    'pelvis',
+    'palm.01',
+    'palm.02',
+    'palm.03',
+    'palm.04',
+]
+
 META_IGNORED = BASE_IGNORED + [
     # Assumed to be in correct position by default.
     'heel.02',
@@ -11,10 +19,6 @@ META_IGNORED = BASE_IGNORED + [
     # Expressions managed by shape keys.
     'face',
     'teeth',
-]
-
-BONES_DELETE = [
-    'pelvis',
 ]
 
 LIMB_BONES = [
@@ -57,7 +61,6 @@ def generate_meta_rig(vroid_rig):
     bpy.ops.object.armature_human_metarig_add()
     meta_rig = bpy.context.view_layer.objects.active
     meta_rig.name = f"{vroid_rig.name}.metarig"
-    position_meta_rig(meta_rig, vroid_rig)
 
     # Remove unneeded bones.
     with editing(meta_rig):
@@ -65,6 +68,9 @@ def generate_meta_rig(vroid_rig):
         for bone in objects_by_patterns(edit_bones, BONES_DELETE):
             LOGGER.info(f"deleting meta-rig bone '{bone.name}'")
             edit_bones.remove(bone)
+
+    # Align meta-rig bones with VRoid model.
+    position_meta_rig(meta_rig, vroid_rig)
 
     # Amend armature limbs.
     pose_bones = meta_rig.pose.bones
