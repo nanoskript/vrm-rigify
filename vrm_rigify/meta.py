@@ -26,6 +26,14 @@ LIMB_BONES = [
     'thigh',
 ]
 
+SUPER_FINGER_BONES = [
+    'f_pinky.01',
+    'f_ring.01',
+    'f_middle.01',
+    'f_index.01',
+    'thumb.01',
+]
+
 
 def meta_rig_base_bones(meta_rig):
     for bone in meta_rig.data.edit_bones:
@@ -75,11 +83,17 @@ def generate_meta_rig(vroid_rig):
     # Amend armature limbs.
     pose_bones = meta_rig.pose.bones
     for bone in objects_by_patterns(pose_bones, LIMB_BONES):
-        LOGGER.info(f"amending bone parameters for '{bone.name}'")
+        LOGGER.info(f"amending bone parameters for limb '{bone.name}'")
         # Amend resultant bone count.
         bone.rigify_parameters.segments = 1
         # Ensure local bend direction is correct.
         bone.rigify_parameters.rotation_axis = 'x'
+
+    # Amend armature fingers.
+    for bone in objects_by_patterns(pose_bones, SUPER_FINGER_BONES):
+        LOGGER.info(f"amending bone parameters for finger '{bone.name}'")
+        # Ensure primary bend direction is correct.
+        bone.rigify_parameters.primary_rotation_axis = 'Z'
 
     # Return generated meta-rig object.
     LOGGER.info("meta-rig generated")

@@ -2,7 +2,7 @@ bl_info = {
     "name": "VRM Rigify",
     "author": "Nanoskript",
     "description": "Generates Rigify armatures for VRM models",
-    "version": (0, 1, 0),
+    "version": (0, 1, 1),
     "blender": (2, 80, 0),
     "location": "Operator Search > VRM Rigify",
     "doc_url": "https://github.com/Nanoskript/vrm-rigify",
