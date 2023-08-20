@@ -66,11 +66,23 @@ only supports the VRM 0.x format.
 
    <img src="docs/parent_meshes.png" width="384px">
 
-4. The meshes are now bound to the Rigify armature! You can pose the model by entering `Pose Mode`:
+4. The meshes should now be parented to the new armature. Expand the contents of the
+   new armature object in the outliner:
+
+   <img src="docs/meshes_under_rig.png" width="384px">
+
+5. For each mesh, under their `Modifiers`, move any armature modifiers to the top of
+   the modifier list, before all other modifiers:
+
+   <img src="docs/mesh_modifiers.png" width="384px">
+
+   You do not have to do this if there are no other modifiers present.
+
+6. You can now pose the model by entering `Pose Mode`:
 
    <img src="docs/pose.png" width="256px">
 
-5. (Optional) Remove any objects that are no longer needed:
+7. (Optional) Remove any objects that are no longer needed:
 
    <img src="docs/delete.png" width="384px">
 
