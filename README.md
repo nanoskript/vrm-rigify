@@ -22,8 +22,9 @@ only supports the VRM 0.x format.
 
    <img src="docs/enable.png" width="256px">
 
-6. In the same `Blender Preferences` window, go to `Interface`.
-7. Check the box labelled `Developer Extras`. This is necessary to show the addon's commands in Blender's operator
+6. Ensure the addons `Import-Export: VRM format` and `Rigging: Rigify` are also enabled.
+7. In the same `Blender Preferences` window, go to `Interface`.
+8. Check the box labelled `Developer Extras`. This is necessary to show the addon's commands in Blender's operator
    search menu:
 
    <img src="docs/developer.png" width="384px">

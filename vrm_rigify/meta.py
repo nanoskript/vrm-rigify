@@ -65,10 +65,13 @@ def generate_meta_rig(vroid_rig):
     bpy.ops.vrm.bones_rename(armature_name=vroid_rig.name)
 
     # Spawn meta-rig.
-    LOGGER.info("creating and positioning meta-rig")
-    bpy.ops.object.armature_human_metarig_add()
-    meta_rig = bpy.context.view_layer.objects.active
-    meta_rig.name = f"{vroid_rig.name}.metarig"
+    try:
+        LOGGER.info("creating and positioning meta-rig")
+        bpy.ops.object.armature_human_metarig_add()
+        meta_rig = bpy.context.view_layer.objects.active
+        meta_rig.name = f"{vroid_rig.name}.metarig"
+    except AttributeError as e:
+        raise Exception("Failed to spawn meta-rig. Is the Rigify addon enabled?") from e
 
     # Remove unneeded bones.
     with editing(meta_rig):
