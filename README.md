@@ -6,8 +6,13 @@ Generate Blender Rigify armatures for VRM models.
 
 ## Notice
 
-This addon has been tested with [VRoid's sample avatars](https://vroid.pixiv.help/hc/en-us/articles/4402394424089) and
-only supports the VRM 0.x format.
+The latest version of this addon has been developed with:
+
+- Blender version 4.1.1
+- VRM Add-on for Blender version 2.20.54
+
+and supports both the VRM 0.x and 1.0 format. This addon has been tested using
+[VRoid's sample avatars](https://vroid.pixiv.help/hc/en-us/articles/4402394424089).
 
 ## Installation
 

@@ -1,2 +1,4 @@
 .DS_Store
 /vrm_rigify.zip
+/.pdm-python
+/.venv

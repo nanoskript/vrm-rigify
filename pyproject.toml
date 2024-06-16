@@ -1,0 +1,6 @@
+[project]
+dependencies = [
+    "fake-bpy-module-4-1>=20240604",
+]
+requires-python = ">=3.11,<3.12"
+
