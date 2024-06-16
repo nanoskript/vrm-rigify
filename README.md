@@ -12,11 +12,12 @@ The latest version of this addon has been developed with:
 - VRM Add-on for Blender version 2.20.54
 
 and supports both the VRM 0.x and 1.0 format. This addon has been tested using
-[VRoid's sample avatars](https://vroid.pixiv.help/hc/en-us/articles/4402394424089).
+[VRoid's sample avatars](https://vroid.pixiv.help/hc/en-us/articles/4402394424089). If you're using an older version of
+Blender (2.x or 3.x), use [version 0.1.1](https://github.com/nanoskript/vrm-rigify/releases/tag/v0.1.1) of this addon.
 
 ## Installation
 
-1. Download `vrm_rigify.zip` from the [releases page](https://github.com/Nanoskript/vrm-rigify/releases/tag/latest).
+1. Download `vrm_rigify.zip` from the [releases page](https://github.com/Nanoskript/vrm-rigify/releases/latest).
 2. Install [VRM Add-on for Blender](https://vrm-addon-for-blender.info/en/) if it is not already installed.
 3. Open Blender and go to `Edit` > `Preferences` > `Add-ons`:
 
@@ -50,7 +51,7 @@ and supports both the VRM 0.x and 1.0 format. This addon has been tested using
 
    <img src="docs/operator_search.png" width="256px">
 
-4. Search for `Generate Humanized VRM Rig` and press `Enter`:
+4. Search for `Generate Rigify armature for VRM model` and press `Enter`:
 
    <img src="docs/generate_rig.png" width="384px">
 
