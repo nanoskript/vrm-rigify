@@ -63,11 +63,11 @@ def generate_template_metarig(metarig_name: str) -> bpy.types.Object:
 
 def compute_metarig_and_vrm_model_bone_mapping(metarig: bpy.types.Object, vrm_object: bpy.types.Object):
     bpy.ops.vrm.assign_vrm1_humanoid_human_bones_automatically(
-        armature_name=metarig.name
+        armature_object_name=metarig.name
     )
 
     bpy.ops.vrm.assign_vrm1_humanoid_human_bones_automatically(
-        armature_name=vrm_object.name
+        armature_object_name=vrm_object.name
     )
 
     armature_metarig: bpy.types.Armature = metarig.data
