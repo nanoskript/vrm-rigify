@@ -1,0 +1,41 @@
+name: test
+# Tests run against the latest release of the VRM addon, so every
+# push also checks for incompatibilities with new addon versions.
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        # The oldest supported LTS release and the latest release.
+        blender-version: ["4.5.11", "5.1.2"]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Blender dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes \
+            libegl1 libgl1 libsm6 libx11-6 libxfixes3 libxi6 \
+            libxkbcommon0 libxrender1 libxxf86vm1
+      - name: Download Blender
+        run: |
+          MAJOR_MINOR=$(echo "${{ matrix.blender-version }}" | cut --delimiter=. --fields=1,2)
+          curl --fail --location --silent --show-error --output blender.tar.xz \
+            "https://download.blender.org/release/Blender${MAJOR_MINOR}/blender-${{ matrix.blender-version }}-linux-x64.tar.xz"
+          mkdir --parents "$HOME/blender"
+          tar --extract --file blender.tar.xz --directory "$HOME/blender" --strip-components=1
+      - name: Cache sample models
+        uses: actions/cache@v4
+        with:
+          path: |
+            tests/assets/*.vrm
+          key: sample-models-${{ hashFiles('tests/run.sh') }}
+      - name: Run tests
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: BLENDER="$HOME/blender/blender" ./tests/run.sh
