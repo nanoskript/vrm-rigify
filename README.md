@@ -6,14 +6,19 @@ Generate Blender Rigify armatures for VRM models.
 
 ## Notice
 
-The latest version of this addon has been developed with:
+The latest version of this addon has been tested with:
 
-- Blender version 4.1.1
-- VRM Add-on for Blender version 2.20.54
+- Blender versions 4.1.1 through 5.1.2
+- VRM Add-on for Blender versions 2.20.54 through 4.4.0
 
 and supports both the VRM 0.x and 1.0 format. This addon has been tested using
 [VRoid's sample avatars](https://vroid.pixiv.help/hc/en-us/articles/4402394424089). If you're using an older version of
 Blender (2.x or 3.x), use [version 0.1.1](https://github.com/nanoskript/vrm-rigify/releases/tag/v0.1.1) of this addon.
+
+This addon is designed for models authored in VRoid Studio or models that follow
+VRoid's bone naming conventions (`J_Bip_C_Chest`). Models with bone names that
+collide with the names of the control bones that Rigify generates (`chest`,
+`f_index.01.L`) are not supported: their meshes will not follow the generated rig.
 
 ## Installation
 
@@ -92,6 +97,22 @@ Blender (2.x or 3.x), use [version 0.1.1](https://github.com/nanoskript/vrm-rigi
 7. (Optional) Remove any objects that are no longer needed:
 
    <img src="docs/delete.png" width="384px">
+
+## Testing
+
+With [Blender](https://www.blender.org/) 4.2 or later installed (the test
+runner installs the VRM addon through Blender's extension system), run:
+
+```sh
+./tests/run.sh
+```
+
+This downloads the latest release of the VRM addon and a set of sample models,
+then generates a rig for each model in the background and checks the result.
+Everything runs against an isolated Blender configuration in `tests/.blender`
+so your own Blender preferences and addons are not touched. Tests also run
+on GitHub Actions for every push to catch incompatibilities with new
+versions of Blender and the VRM addon.
 
 ## License
 
