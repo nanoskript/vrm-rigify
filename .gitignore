@@ -2,3 +2,6 @@
 /vrm_rigify.zip
 /.pdm-python
 /.venv
+/tests/assets/
+/tests/.blender*/
+__pycache__/
