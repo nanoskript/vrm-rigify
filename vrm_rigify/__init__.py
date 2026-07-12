@@ -285,14 +285,22 @@ def attach_unmapped_vrm_model_bones_to_rig(rig_object: bpy.types.Object, vrm_obj
                 collection.assign(bone_in_rig)
 
 
+def assign_id_property(container, key: str, value):
+    # Blender 5.0 disallows assigning over an existing
+    # group property so remove any existing property first.
+    if key in container:
+        del container[key]
+    container[key] = value
+
+
 # Enables use of the blend shape proxy and expressions panel from the VRM addon.
 def copy_shape_key_controls_from_vrm_armature(rig_object: bpy.types.Object, vrm_object: bpy.types.Object):
     armature_rig: bpy.types.Armature = rig_object.data
     armature_vrm: bpy.types.Armature = vrm_object.data
     blend_shape_master = armature_vrm.vrm_addon_extension.vrm0["blend_shape_master"]
-    armature_rig.vrm_addon_extension.vrm0["blend_shape_master"] = blend_shape_master
+    assign_id_property(armature_rig.vrm_addon_extension.vrm0, "blend_shape_master", blend_shape_master)
     expressions = armature_vrm.vrm_addon_extension.vrm1["expressions"]
-    armature_rig.vrm_addon_extension.vrm1["expressions"] = expressions
+    assign_id_property(armature_rig.vrm_addon_extension.vrm1, "expressions", expressions)
 
 
 def disable_ik_stretching(rig_object: bpy.types.Object):
