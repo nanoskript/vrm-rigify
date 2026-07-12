@@ -90,10 +90,15 @@ def compute_metarig_and_vrm_model_bone_mapping(metarig: bpy.types.Object, vrm_ob
         if bone_type in ["last_bone_names", "initial_automatic_bone_assignment"]:
             continue
 
-        metarig_bone = getattr(metarig_human_bones, bone_type).node
-        vrm_bone = getattr(vrm_human_bones, bone_type).node
-        if vrm_bone.bone_name:
-            bone_mapping.append((metarig_bone.bone_name, vrm_bone.bone_name))
+        # Newer versions of the VRM addon include entries in `human_bones`
+        # that are not bone references, so skip anything without a `node`.
+        metarig_bone = getattr(metarig_human_bones, bone_type, None)
+        vrm_bone = getattr(vrm_human_bones, bone_type, None)
+        if not (hasattr(metarig_bone, "node") and hasattr(vrm_bone, "node")):
+            continue
+
+        if vrm_bone.node.bone_name:
+            bone_mapping.append((metarig_bone.node.bone_name, vrm_bone.node.bone_name))
     return bone_mapping
 
 
