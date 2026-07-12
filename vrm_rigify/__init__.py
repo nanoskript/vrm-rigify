@@ -227,12 +227,18 @@ def rename_rig_bones_to_match_vrm_model_vertex_groups(rig_object: bpy.types.Obje
     with ModeContext.editing(rig_object):
         for metarig_bone_name, vrm_bone_name in bone_mapping:
             if metarig_bone_name in ["eye.L", "eye.R"]:
-                rig_bone = armature_rig.edit_bones[f"ORG-{metarig_bone_name}"]
-                rig_bone.use_deform = True
+                rig_bone_name = f"ORG-{metarig_bone_name}"
             else:
-                rig_bone = armature_rig.edit_bones[f"DEF-{metarig_bone_name}"]
-                assert rig_bone.use_deform
+                rig_bone_name = f"DEF-{metarig_bone_name}"
 
+            # Rigify may not generate a bone for every mapped metarig bone
+            # depending on the model and the Rigify version.
+            if rig_bone_name not in armature_rig.edit_bones:
+                print(f"rig bone '{rig_bone_name}' not found so skipping rename")
+                continue
+
+            rig_bone = armature_rig.edit_bones[rig_bone_name]
+            rig_bone.use_deform = True
             print(f"renaming bone '{full_bone_path(rig_bone)}' to '{vrm_bone_name}'")
             rig_bone.name = vrm_bone_name
 
