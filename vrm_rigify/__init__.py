@@ -113,8 +113,12 @@ def remove_or_log_unmapped_metarig_bones(metarig: bpy.types.Object, bone_mapping
             # spine.003 (Upper Chest) is an optional VRM bone. Remove it if it
             # cannot be mapped or else Rigify will fail to generate the rig due to
             # a disconnection between spine.003 and spine.004.
+            # spine.005 (upper neck) can never be mapped because VRM models only
+            # have a single neck bone. If it is kept, it collapses to zero length
+            # and breaks the neck chain, so Rigify will not generate a deform
+            # bone for the head.
             # FIXME: Add heuristics for mapping breast bones.
-            if metarig_bone.name not in ["spine.003", "breast.L", "breast.R"]:
+            if metarig_bone.name not in ["spine.003", "spine.005", "breast.L", "breast.R"]:
                 print(f"metarig bone is not mapped '{full_bone_path(metarig_bone)}'")
                 continue
 
@@ -137,13 +141,22 @@ def position_metarig_bones_to_vrm_model(metarig: bpy.types.Object, vrm_object: b
             metarig_bone.tail = vrm_bone.tail_local
 
 
-def fix_position_of_metarig_spine_bones(metarig: bpy.types.Object):
+def fix_position_of_metarig_spine_bones(metarig: bpy.types.Object, bone_mapping):
+    mapped_metarig_bone_names = set([metarig_bone for metarig_bone, vrm_bone in bone_mapping])
     armature_metarig: bpy.types.Armature = metarig.data
     with ModeContext.editing(metarig):
         # If spine.003 and spine.004 are present, ensure that they are connected
         # to each other, otherwise Rigify will fail to generate the rig.
         armature_metarig.edit_bones["spine.004"].use_connect = True
         armature_metarig.edit_bones["spine.004"].use_connect = False
+
+        # Reconnect the head bone to the end of the neck chain (spine.005 has
+        # been removed), otherwise Rigify will exclude the head bone from the
+        # neck rig and will not generate a deform bone for it. Only reconnect
+        # if the neck bone has been mapped: connecting to an unpositioned neck
+        # bone would move the head bone away from the model's head position.
+        if "spine.004" in mapped_metarig_bone_names:
+            armature_metarig.edit_bones["spine.006"].use_connect = True
 
 
 def remove_metarig_palm_bones(metarig: bpy.types.Object):
@@ -303,7 +316,7 @@ class GenerateVRMRig(bpy.types.Operator):
         remove_metarig_palm_bones(metarig)
         remove_or_log_unmapped_metarig_bones(metarig, bone_mapping)
         position_metarig_bones_to_vrm_model(metarig, vrm_object, bone_mapping)
-        fix_position_of_metarig_spine_bones(metarig)
+        fix_position_of_metarig_spine_bones(metarig, bone_mapping)
         fix_metarig_limb_rotation_axes(metarig)
         rig_object = invoke_rigify_generate(metarig)
 
