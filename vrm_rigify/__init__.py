@@ -61,14 +61,22 @@ def generate_template_metarig(metarig_name: str) -> bpy.types.Object:
         raise Exception("Failed to spawn metarig. Is the Rigify addon enabled?") from e
 
 
-def compute_metarig_and_vrm_model_bone_mapping(metarig: bpy.types.Object, vrm_object: bpy.types.Object):
-    bpy.ops.vrm.assign_vrm1_humanoid_human_bones_automatically(
-        armature_name=metarig.name
-    )
+def assign_vrm1_human_bones_automatically(node: bpy.types.Object):
+    try:
+        bpy.ops.vrm.assign_vrm1_humanoid_human_bones_automatically(
+            armature_object_name=node.name
+        )
+    except TypeError:
+        # Versions of the VRM addon before 4.0 only
+        # accept the `armature_name` argument alias.
+        bpy.ops.vrm.assign_vrm1_humanoid_human_bones_automatically(
+            armature_name=node.name
+        )
 
-    bpy.ops.vrm.assign_vrm1_humanoid_human_bones_automatically(
-        armature_name=vrm_object.name
-    )
+
+def compute_metarig_and_vrm_model_bone_mapping(metarig: bpy.types.Object, vrm_object: bpy.types.Object):
+    assign_vrm1_human_bones_automatically(metarig)
+    assign_vrm1_human_bones_automatically(vrm_object)
 
     armature_metarig: bpy.types.Armature = metarig.data
     armature_vrm: bpy.types.Armature = vrm_object.data
