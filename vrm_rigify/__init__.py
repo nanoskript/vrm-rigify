@@ -7,12 +7,44 @@ bl_info = {
     "author": "Nanoskript",
     "description": "Generates Rigify armatures for VRM models",
     "version": (0, 3, 0),
-    "blender": (4, 1, 0),
+    "blender": (3, 6, 0),
     "location": "Operator Search > VRM Rigify",
     "doc_url": "https://github.com/nanoskript/vrm-rigify",
     "tracker_url": "https://github.com/nanoskript/vrm-rigify/issues",
     "category": "Rigging",
 }
+
+# Version compatibility polyfills. Each polyfill is defined once at import
+# time based on the running Blender version so that version differences are
+# kept out of the rig generation code.
+
+if bpy.app.version >= (4, 0, 0):
+    # Blender 4.0 replaced bone layers with bone collections.
+    def inherit_bone_groupings(bone: bpy.types.EditBone, parent: bpy.types.EditBone):
+        for collection in parent.collections:
+            collection.assign(bone)
+else:
+    def inherit_bone_groupings(bone: bpy.types.EditBone, parent: bpy.types.EditBone):
+        bone.layers = list(parent.layers)
+
+
+if bpy.app.version >= (5, 0, 0):
+    # Blender 5.0 moved pose mode visibility to PoseBone.hide and
+    # changed Bone.hide to only affect edit mode. Earlier versions
+    # hide bones in pose mode through Bone.hide alone.
+    def hide_pose_bone(bone: bpy.types.PoseBone):
+        bone.hide = True
+else:
+    def hide_pose_bone(bone: bpy.types.PoseBone):
+        bone.bone.hide = True
+
+
+def assign_id_property(container, key: str, value):
+    # Blender 5.0 disallows assigning over an existing
+    # group property so remove any existing property first.
+    if key in container:
+        del container[key]
+    container[key] = value
 
 
 class ModeContext:
@@ -280,17 +312,8 @@ def attach_unmapped_vrm_model_bones_to_rig(rig_object: bpy.types.Object, vrm_obj
             bone_in_rig.tail = vrm_bone.tail_local
             bone_in_rig.parent = parent_bone_in_rig
 
-            # Inherit the parent bone collections for the generated bone.
-            for collection in parent_bone_in_rig.collections:
-                collection.assign(bone_in_rig)
-
-
-def assign_id_property(container, key: str, value):
-    # Blender 5.0 disallows assigning over an existing
-    # group property so remove any existing property first.
-    if key in container:
-        del container[key]
-    container[key] = value
+            # Show the generated bone alongside its parent.
+            inherit_bone_groupings(bone_in_rig, parent_bone_in_rig)
 
 
 # Enables use of the blend shape proxy and expressions panel from the VRM addon.
@@ -329,12 +352,7 @@ def hide_finger_tip_controls(rig_object: bpy.types.Object):
 
     for bone in objects_by_name_patterns(rig_object.pose.bones, tip_control_bones):
         print(f"hiding inert finger tip control '{bone.name}'")
-        # Blender 5.0 moved pose mode visibility to PoseBone.hide and
-        # changed Bone.hide to only affect edit mode. Earlier versions
-        # hide bones in pose mode through Bone.hide alone.
-        bone.bone.hide = True
-        if hasattr(bone, "hide"):
-            bone.hide = True
+        hide_pose_bone(bone)
 
 
 def disable_ik_stretching(rig_object: bpy.types.Object):
