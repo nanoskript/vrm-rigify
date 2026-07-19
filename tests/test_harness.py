@@ -1,4 +1,5 @@
 import os
+import re
 import sys
 
 import addon_utils
@@ -80,6 +81,39 @@ def check_deform_coverage(rig_object: bpy.types.Object, vertex_group_names: set[
     assert not missing, f"vertex groups have no matching deform bone: {missing}"
 
 
+def check_finger_controls_locked(rig_object: bpy.types.Object):
+    # Translating a finger control stretches the finger's deform chain, which
+    # always looks broken on VRM models, so every finger control must have
+    # its location locked. Locks only affect viewport transforms so this
+    # checks the flags directly.
+    finger_controls = [
+        bone for bone in rig_object.pose.bones
+        if re.match(r"^(f_index|f_middle|f_ring|f_pinky|thumb)\.", bone.name)
+    ]
+
+    assert finger_controls, "no finger control bones found in the generated rig"
+    for bone in finger_controls:
+        assert all(bone.lock_location), \
+            f"finger control '{bone.name}' can be translated"
+
+
+def check_finger_tip_controls_hidden(rig_object: bpy.types.Object):
+    # The fingertip controls are inert once their translation is locked
+    # (their only consumer is a stretch-to constraint reading their
+    # location), so the addon hides them.
+    tip_controls = [
+        bone for bone in rig_object.pose.bones
+        if re.match(r"^(f_index|f_middle|f_ring|f_pinky|thumb)\.\d+\.(L|R)\.001$", bone.name)
+    ]
+
+    assert tip_controls, "no fingertip control bones found in the generated rig"
+    for bone in tip_controls:
+        # Blender 5.0 moved pose mode visibility to PoseBone.hide while
+        # earlier versions hide bones in pose mode through Bone.hide.
+        hidden = bone.hide if hasattr(bone, "hide") else bone.bone.hide
+        assert hidden, f"inert fingertip control '{bone.name}' is visible"
+
+
 def check_shape_key_controls(rig_object: bpy.types.Object, vrm_object: bpy.types.Object):
     rig_extension = rig_object.data.vrm_addon_extension
     vrm_extension = vrm_object.data.vrm_addon_extension
@@ -121,6 +155,8 @@ def main():
 
     check_control_bones_exist(rig_object)
     check_deform_coverage(rig_object, vertex_group_names)
+    check_finger_controls_locked(rig_object)
+    check_finger_tip_controls_hidden(rig_object)
     check_shape_key_controls(rig_object, vrm_object)
 
     print(f"model '{os.path.basename(model_path)}' passed all checks")

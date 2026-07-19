@@ -303,6 +303,40 @@ def copy_shape_key_controls_from_vrm_armature(rig_object: bpy.types.Object, vrm_
     assign_id_property(armature_rig.vrm_addon_extension.vrm1, "expressions", expressions)
 
 
+def lock_finger_control_translation(rig_object: bpy.types.Object):
+    # Rigify leaves the finger FK, tip, and master controls free to
+    # translate, which stretches the finger deform chain. VRM models have
+    # rigid vertex weights so stretched fingers always deform badly. Curling
+    # fingers by scaling the master control is unaffected by these locks.
+    finger_control_bones = [
+        r"^(f_index|f_middle|f_ring|f_pinky|thumb)\.\d+\.(L|R)(\.001)?$",
+        r"^(f_index|f_middle|f_ring|f_pinky|thumb)\.\d+_master\.(L|R)$",
+    ]
+
+    for bone in objects_by_name_patterns(rig_object.pose.bones, finger_control_bones):
+        print(f"locking translation of finger control '{bone.name}'")
+        bone.lock_location = (True, True, True)
+
+
+def hide_finger_tip_controls(rig_object: bpy.types.Object):
+    # With translation locked, the fingertip controls have no function left:
+    # the only consumer of each one is a stretch-to constraint on the last
+    # finger segment, which reads nothing but its location. Hide them so the
+    # rig only shows controls that do something.
+    tip_control_bones = [
+        r"^(f_index|f_middle|f_ring|f_pinky|thumb)\.\d+\.(L|R)\.001$",
+    ]
+
+    for bone in objects_by_name_patterns(rig_object.pose.bones, tip_control_bones):
+        print(f"hiding inert finger tip control '{bone.name}'")
+        # Blender 5.0 moved pose mode visibility to PoseBone.hide and
+        # changed Bone.hide to only affect edit mode. Earlier versions
+        # hide bones in pose mode through Bone.hide alone.
+        bone.bone.hide = True
+        if hasattr(bone, "hide"):
+            bone.hide = True
+
+
 def disable_ik_stretching(rig_object: bpy.types.Object):
     for bone in rig_object.pose.bones:
         stretch_key = "IK_Stretch"
@@ -332,6 +366,8 @@ class GenerateVRMRig(bpy.types.Operator):
         rename_rig_bones_to_match_vrm_model_vertex_groups(rig_object, bone_mapping)
         attach_unmapped_vrm_model_bones_to_rig(rig_object, vrm_object)
         copy_shape_key_controls_from_vrm_armature(rig_object, vrm_object)
+        lock_finger_control_translation(rig_object)
+        hide_finger_tip_controls(rig_object)
         disable_ik_stretching(rig_object)
 
         metarig.hide_set(True)
