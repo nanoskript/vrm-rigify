@@ -99,8 +99,7 @@ collide with the names of the control bones that Rigify generates (`chest`,
 
 ## Testing
 
-With [Blender](https://www.blender.org/) 4.2 or later installed (the test
-runner installs the VRM addon through Blender's extension system), run:
+With [Blender](https://www.blender.org/) 3.6 or later installed, run:
 
 ```sh
 ./tests/run.sh
@@ -108,8 +107,11 @@ runner installs the VRM addon through Blender's extension system), run:
 
 This downloads the latest release of the VRM addon and a set of sample models,
 then generates a rig for each model in the background and checks the result.
-Everything runs against an isolated Blender configuration in `tests/.blender`
-so your own Blender preferences and addons are not touched. Tests also run
+The VRM addon is installed through Blender's extension system on Blender 4.2
+and later and as a legacy addon on earlier versions. Everything runs against
+an isolated Blender configuration in `tests/.blender` (or `tests/.blender-legacy`
+for versions before 4.2) so your own Blender preferences and addons are not
+touched. Tests also run
 on GitHub Actions for every push to catch incompatibilities with new
 versions of Blender and the VRM addon.
 
