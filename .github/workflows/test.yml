@@ -12,8 +12,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # The oldest supported LTS release and the latest release.
-        blender-version: ["4.5.11", "5.1.2"]
+        # The oldest supported LTS release, the newest LTS
+        # release, and the latest release.
+        blender-version: ["3.6.23", "4.5.11", "5.1.2"]
     steps:
       - uses: actions/checkout@v4
       - name: Install Blender dependencies
