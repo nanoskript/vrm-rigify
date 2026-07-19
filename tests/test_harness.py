@@ -4,6 +4,7 @@ import sys
 
 import addon_utils
 import bpy
+from mathutils import Vector
 
 # Make the addon under test importable from the repository.
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
@@ -114,6 +115,66 @@ def check_finger_tip_controls_hidden(rig_object: bpy.types.Object):
         assert hidden, f"inert fingertip control '{bone.name}' is visible"
 
 
+def weighted_vertex_bounds(vrm_object: bpy.types.Object, group_name: str):
+    # Bounding box of the vertices that predominantly follow the given bone.
+    points = []
+    for mesh in vrm_object.children_recursive:
+        if mesh.type != "MESH":
+            continue
+
+        group = mesh.vertex_groups.get(group_name)
+        if group is None:
+            continue
+
+        for vertex in mesh.data.vertices:
+            for entry in vertex.groups:
+                if entry.group == group.index and entry.weight > 0.3:
+                    points.append(mesh.matrix_world @ vertex.co)
+
+    assert points, f"no vertices are weighted to bone '{group_name}'"
+    minimum = Vector(map(min, zip(*points)))
+    maximum = Vector(map(max, zip(*points)))
+    return minimum, maximum
+
+
+def check_control_widget_sizes(rig_object: bpy.types.Object, vrm_object: bpy.types.Object):
+    # The head and IK hand widgets must be scaled to the model's proportions
+    # or they render inside the meshes and cannot be selected in the
+    # viewport. A widget is drawn at its bone's length multiplied by the
+    # widget's display scale.
+    human_bones = vrm_object.data.vrm_addon_extension.vrm1.humanoid.human_bones
+
+    # The head circle's diameter is the head bone's length. It must clear
+    # the head, measured as the widest horizontal extent of the vertices
+    # weighted to the head bone.
+    head_bone_name = human_bones.head.node.bone_name
+    minimum, maximum = weighted_vertex_bounds(vrm_object, head_bone_name)
+    head_extent = max(maximum.x - minimum.x, maximum.y - minimum.y)
+    head_control = rig_object.pose.bones["head"]
+    diameter = abs(head_control.custom_shape_scale_xyz[0]) * head_control.bone.length
+    assert diameter >= head_extent, \
+        f"head widget diameter {diameter:.3f} is inside the head ({head_extent:.3f} wide)"
+
+    # The hand widget spans its bone's length so it must cover
+    # most of the palm to wrap around the hand.
+    hand_bones_by_side = {
+        "L": (human_bones.left_hand, human_bones.left_middle_proximal),
+        "R": (human_bones.right_hand, human_bones.right_middle_proximal),
+    }
+
+    for side, (hand, middle) in hand_bones_by_side.items():
+        if not (hand.node.bone_name and middle.node.bone_name):
+            continue
+
+        hand_bone = vrm_object.data.bones[hand.node.bone_name]
+        middle_bone = vrm_object.data.bones[middle.node.bone_name]
+        palm_length = (middle_bone.head_local - hand_bone.head_local).length
+        control = rig_object.pose.bones[f"hand_ik.{side}"]
+        length = abs(control.custom_shape_scale_xyz[1]) * control.bone.length
+        assert length >= 0.9 * palm_length, \
+            f"hand widget '{control.name}' spans {length:.3f} of the {palm_length:.3f} palm"
+
+
 def check_shape_key_controls(rig_object: bpy.types.Object, vrm_object: bpy.types.Object):
     rig_extension = rig_object.data.vrm_addon_extension
     vrm_extension = vrm_object.data.vrm_addon_extension
@@ -157,6 +218,7 @@ def main():
     check_deform_coverage(rig_object, vertex_group_names)
     check_finger_controls_locked(rig_object)
     check_finger_tip_controls_hidden(rig_object)
+    check_control_widget_sizes(rig_object, vrm_object)
     check_shape_key_controls(rig_object, vrm_object)
 
     print(f"model '{os.path.basename(model_path)}' passed all checks")

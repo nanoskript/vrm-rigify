@@ -355,6 +355,51 @@ def hide_finger_tip_controls(rig_object: bpy.types.Object):
         hide_pose_bone(bone)
 
 
+def scale_control_widget(bone: bpy.types.PoseBone, factor: float):
+    # Widget display transforms are purely visual so
+    # scaling them does not affect the rig's behavior.
+    bone.custom_shape_scale_xyz = [component * factor for component in bone.custom_shape_scale_xyz]
+
+
+def enlarge_head_control_widget(rig_object: bpy.types.Object):
+    # Rigify draws the head control circle at the tail of the head bone
+    # with a diameter of the bone's length, assuming the bone spans the
+    # whole skull like the default metarig's. VRM head bones end around
+    # ear level so the circle ends up buried inside the head mesh. Scale
+    # the widget up so the circle clears the head: VRM head bones are
+    # roughly a third of the head's size.
+    bone = rig_object.pose.bones["head"]
+    print(f"enlarging control widget '{bone.name}'")
+    scale_control_widget(bone, 4.0)
+
+
+def fit_hand_control_widgets_to_palms(
+    rig_object: bpy.types.Object, vrm_object: bpy.types.Object, bone_mapping
+):
+    # Rigify draws the IK hand widget scaled by the hand bone's length,
+    # assuming the bone spans the palm from the wrist to the knuckles.
+    # VRM 0.x models import with a short stub of a hand bone so the
+    # widget collapses into the palm. Rescale the widget to span the
+    # model's actual palm: from the wrist to the middle finger's knuckle.
+    mapping = dict(bone_mapping)
+    armature_vrm: bpy.types.Armature = vrm_object.data
+    for side in ["L", "R"]:
+        hand_bone_name = mapping.get(f"hand.{side}")
+        middle_bone_name = mapping.get(f"f_middle.01.{side}")
+        if not (hand_bone_name and middle_bone_name):
+            print(f"no palm mapping for side '{side}' so skipping hand widget")
+            continue
+
+        hand_bone = armature_vrm.bones[hand_bone_name]
+        middle_bone = armature_vrm.bones[middle_bone_name]
+        palm_length = (middle_bone.head_local - hand_bone.head_local).length
+
+        bone = rig_object.pose.bones[f"hand_ik.{side}"]
+        factor = palm_length / hand_bone.length
+        print(f"scaling control widget '{bone.name}' by {factor:.2f}")
+        scale_control_widget(bone, factor)
+
+
 def disable_ik_stretching(rig_object: bpy.types.Object):
     for bone in rig_object.pose.bones:
         stretch_key = "IK_Stretch"
@@ -386,6 +431,8 @@ class GenerateVRMRig(bpy.types.Operator):
         copy_shape_key_controls_from_vrm_armature(rig_object, vrm_object)
         lock_finger_control_translation(rig_object)
         hide_finger_tip_controls(rig_object)
+        enlarge_head_control_widget(rig_object)
+        fit_hand_control_widgets_to_palms(rig_object, vrm_object, bone_mapping)
         disable_ik_stretching(rig_object)
 
         metarig.hide_set(True)
