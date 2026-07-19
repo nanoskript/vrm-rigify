@@ -1,6 +1,7 @@
 import os
 import re
 import sys
+from math import degrees
 
 import addon_utils
 import bpy
@@ -175,6 +176,25 @@ def check_control_widget_sizes(rig_object: bpy.types.Object, vrm_object: bpy.typ
             f"hand widget '{control.name}' spans {length:.3f} of the {palm_length:.3f} palm"
 
 
+def check_eye_bones_at_rest(rig_object: bpy.types.Object, vrm_object: bpy.types.Object):
+    # A constraint aims each eye bone at a target control. If the target
+    # does not sit on the eye bone's axis, the constraint rotates the eyes
+    # out of their sockets while the rig is still at rest, so the model's
+    # eyes twist as soon as its meshes follow the rig.
+    bpy.context.view_layer.update()
+    human_bones = vrm_object.data.vrm_addon_extension.vrm1.humanoid.human_bones
+    for key in ["left_eye", "right_eye"]:
+        bone_name = getattr(human_bones, key).node.bone_name
+        if not (bone_name and bone_name in rig_object.pose.bones):
+            continue
+
+        bone = rig_object.pose.bones[bone_name]
+        delta = (bone.matrix @ bone.bone.matrix_local.inverted()).to_quaternion()
+        angle = min(degrees(delta.angle), 360.0 - degrees(delta.angle))
+        assert angle < 1.0, \
+            f"eye bone '{bone_name}' is rotated {angle:.1f} degrees at rest"
+
+
 def check_shape_key_controls(rig_object: bpy.types.Object, vrm_object: bpy.types.Object):
     rig_extension = rig_object.data.vrm_addon_extension
     vrm_extension = vrm_object.data.vrm_addon_extension
@@ -219,6 +239,7 @@ def main():
     check_finger_controls_locked(rig_object)
     check_finger_tip_controls_hidden(rig_object)
     check_control_widget_sizes(rig_object, vrm_object)
+    check_eye_bones_at_rest(rig_object, vrm_object)
     check_shape_key_controls(rig_object, vrm_object)
 
     print(f"model '{os.path.basename(model_path)}' passed all checks")

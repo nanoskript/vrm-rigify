@@ -1,6 +1,7 @@
 import re
 
 import bpy
+from mathutils import Vector
 
 bl_info = {
     "name": "VRM Rigify",
@@ -189,6 +190,27 @@ def fix_position_of_metarig_spine_bones(metarig: bpy.types.Object, bone_mapping)
         # bone would move the head bone away from the model's head position.
         if "spine.004" in mapped_metarig_bone_names:
             armature_metarig.edit_bones["spine.006"].use_connect = True
+
+
+def fix_orientation_of_metarig_eye_bones(metarig: bpy.types.Object):
+    # Rigify's eye rig assumes the eye bones point straight out of the head,
+    # from the eyeball's center through the pupil: it aims each eye at a
+    # target control placed in front of the face along the average of both
+    # eyes' axes. VRM 1.0 models import with their original eye bone
+    # orientations, which VRoid tilts outwards, so the aim constraint
+    # rotates the eyes out of their sockets while the rig is still at rest.
+    # Point the metarig's eye bones straight forward: only the eyeball's
+    # center position affects skinning.
+    armature_metarig: bpy.types.Armature = metarig.data
+    with ModeContext.editing(metarig):
+        for bone_name in ["eye.L", "eye.R"]:
+            bone = armature_metarig.edit_bones.get(bone_name)
+            if bone is None:
+                continue
+
+            print(f"pointing metarig eye bone '{bone.name}' forward")
+            bone.tail = bone.head + Vector((0.0, -bone.length, 0.0))
+            bone.roll = 0.0
 
 
 def remove_metarig_palm_bones(metarig: bpy.types.Object):
@@ -422,6 +444,7 @@ class GenerateVRMRig(bpy.types.Operator):
         remove_or_log_unmapped_metarig_bones(metarig, bone_mapping)
         position_metarig_bones_to_vrm_model(metarig, vrm_object, bone_mapping)
         fix_position_of_metarig_spine_bones(metarig, bone_mapping)
+        fix_orientation_of_metarig_eye_bones(metarig)
         fix_metarig_limb_rotation_axes(metarig)
         rig_object = invoke_rigify_generate(metarig)
 
