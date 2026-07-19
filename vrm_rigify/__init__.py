@@ -383,16 +383,52 @@ def scale_control_widget(bone: bpy.types.PoseBone, factor: float):
     bone.custom_shape_scale_xyz = [component * factor for component in bone.custom_shape_scale_xyz]
 
 
-def enlarge_head_control_widget(rig_object: bpy.types.Object):
+def head_crown_offset(vrm_object: bpy.types.Object, head_bone_name: str) -> float:
+    # Highest extent of the vertices weighted to the head bone,
+    # measured along the head bone's axis from the bone's head.
+    head_bone = vrm_object.data.bones[head_bone_name]
+    origin = vrm_object.matrix_world @ head_bone.head_local
+    axis = vrm_object.matrix_world.to_3x3() @ (head_bone.tail_local - head_bone.head_local)
+    axis.normalize()
+
+    offset = 0.0
+    for mesh in vrm_object.children_recursive:
+        if mesh.type != "MESH":
+            continue
+
+        group = mesh.vertex_groups.get(head_bone_name)
+        if group is None:
+            continue
+
+        for vertex in mesh.data.vertices:
+            for entry in vertex.groups:
+                if entry.group == group.index and entry.weight > 0.3:
+                    point = mesh.matrix_world @ vertex.co
+                    offset = max(offset, (point - origin).dot(axis))
+    return offset
+
+
+def fit_head_control_widget_to_crown(
+    rig_object: bpy.types.Object, vrm_object: bpy.types.Object, bone_mapping
+):
     # Rigify draws the head control circle at the tail of the head bone
     # with a diameter of the bone's length, assuming the bone spans the
     # whole skull like the default metarig's. VRM head bones end around
-    # ear level so the circle ends up buried inside the head mesh. Scale
-    # the widget up so the circle clears the head: VRM head bones are
-    # roughly a third of the head's size.
+    # ear level so the circle ends up buried inside the head mesh. Widen
+    # the circle to clear the head: VRM head bones are roughly a third of
+    # the head's size. The widget's Y scale sets how far along the bone the
+    # circle is drawn, so place it just above the crown: the highest vertex
+    # that follows the head bone. Head bone lengths vary a lot between
+    # models so a fixed height either buries the circle or floats it.
     bone = rig_object.pose.bones["head"]
-    print(f"enlarging control widget '{bone.name}'")
-    scale_control_widget(bone, 4.0)
+    head_bone_name = dict(bone_mapping).get("spine.006")
+    crown = head_crown_offset(vrm_object, head_bone_name) if head_bone_name else 0.0
+    height = max(1.05 * crown / bone.bone.length, 1.0) if crown else 4.0
+    print(f"fitting control widget '{bone.name}' to height {height:.2f}")
+    bone.custom_shape_scale_xyz = [
+        component * factor
+        for component, factor in zip(bone.custom_shape_scale_xyz, [4.0, height, 4.0])
+    ]
 
 
 def fit_hand_control_widgets_to_palms(
@@ -454,7 +490,7 @@ class GenerateVRMRig(bpy.types.Operator):
         copy_shape_key_controls_from_vrm_armature(rig_object, vrm_object)
         lock_finger_control_translation(rig_object)
         hide_finger_tip_controls(rig_object)
-        enlarge_head_control_widget(rig_object)
+        fit_head_control_widget_to_crown(rig_object, vrm_object, bone_mapping)
         fit_hand_control_widgets_to_palms(rig_object, vrm_object, bone_mapping)
         disable_ik_stretching(rig_object)
 

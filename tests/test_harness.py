@@ -156,6 +156,14 @@ def check_control_widget_sizes(rig_object: bpy.types.Object, vrm_object: bpy.typ
     assert diameter >= head_extent, \
         f"head widget diameter {diameter:.3f} is inside the head ({head_extent:.3f} wide)"
 
+    # The circle is drawn at the widget's Y scale in bone lengths along the
+    # bone, so it must sit near the crown: above the top of the head, but
+    # not floating far over it.
+    crown = maximum.z - (rig_object.matrix_world @ head_control.bone.head_local).z
+    height = abs(head_control.custom_shape_scale_xyz[1]) * head_control.bone.length
+    assert crown <= height <= 1.25 * crown, \
+        f"head widget sits {height:.3f} along the bone, crown is at {crown:.3f}"
+
     # The hand widget spans its bone's length so it must cover
     # most of the palm to wrap around the hand.
     hand_bones_by_side = {
