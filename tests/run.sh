@@ -31,9 +31,28 @@ if [ -z "$BLENDER" ]; then
   exit 1
 fi
 
-# Isolate Blender's configuration so tests are reproducible
-# and do not touch the user's own preferences and addons.
-export BLENDER_USER_RESOURCES="$PWD/.blender"
+# Blender 4.2 and later install addons through the extensions platform while
+# earlier versions only support legacy addons. The VRM addon publishes a
+# release asset in each format.
+BLENDER_VERSION=$("$BLENDER" --version | head -n 1 | awk '{print $2}')
+BLENDER_MAJOR=$(echo "$BLENDER_VERSION" | cut -d. -f1)
+BLENDER_MINOR=$(echo "$BLENDER_VERSION" | cut -d. -f2)
+if [ "$BLENDER_MAJOR" -gt 4 ] || { [ "$BLENDER_MAJOR" -eq 4 ] && [ "$BLENDER_MINOR" -ge 2 ]; }; then
+  VRM_ADDON_FORMAT=Extension
+else
+  VRM_ADDON_FORMAT=Legacy
+fi
+
+# Isolate Blender's configuration so tests are reproducible and do not touch
+# the user's own preferences and addons. Legacy installs are kept in a
+# separate directory so a legacy copy of the VRM addon can never shadow the
+# extension install when testing Blender 4.2+.
+if [ "$VRM_ADDON_FORMAT" = Extension ]; then
+  export BLENDER_USER_RESOURCES="$PWD/.blender"
+else
+  export BLENDER_USER_RESOURCES="$PWD/.blender-legacy"
+fi
+mkdir -p "$BLENDER_USER_RESOURCES"
 
 ASSETS="$PWD/assets"
 mkdir -p "$ASSETS"
@@ -61,9 +80,10 @@ fi
 
 VRM_ADDON_URL=$(printf '%s' "$RELEASE" | python3 -c "import json, sys
 release = json.load(sys.stdin)
+want_extension = sys.argv[1] == 'Extension'
 [url] = [asset['browser_download_url'] for asset in release['assets']
-         if 'Extension' in asset['name']]
-print(url)")
+         if ('Extension' in asset['name']) == want_extension]
+print(url)" "$VRM_ADDON_FORMAT")
 VRM_ADDON_ZIP="$ASSETS/$(basename "$VRM_ADDON_URL")"
 download "$VRM_ADDON_URL" "$VRM_ADDON_ZIP"
 
@@ -96,7 +116,15 @@ download "https://github.com/vrm-c/vrm-specification/raw/master/samples/VRM1_Con
 # Install the VRM addon into the isolated Blender configuration.
 VRM_ADDON_MARKER="$BLENDER_USER_RESOURCES/.installed-$(basename "$VRM_ADDON_ZIP")"
 if [ ! -f "$VRM_ADDON_MARKER" ]; then
-  "$BLENDER" --command extension install-file --repo user_default --enable "$VRM_ADDON_ZIP"
+  if [ "$VRM_ADDON_FORMAT" = Extension ]; then
+    "$BLENDER" --command extension install-file --repo user_default --enable "$VRM_ADDON_ZIP"
+  else
+    # Remove other versions of the addon first so the test
+    # harness can never enable a stale install.
+    rm -rf "$BLENDER_USER_RESOURCES/scripts/addons/VRM_Addon_for_Blender"*
+    "$BLENDER" --background --python-exit-code 1 --python-expr \
+      "import bpy; bpy.ops.preferences.addon_install(filepath='$VRM_ADDON_ZIP', overwrite=True)"
+  fi
   touch "$VRM_ADDON_MARKER"
 fi
 
