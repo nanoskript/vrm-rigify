@@ -8,12 +8,11 @@ Generate Blender Rigify armatures for VRM models.
 
 The latest version of this addon has been tested with:
 
-- Blender versions 4.1.1 through 5.1.2
+- Blender versions 3.6.23 through 5.1.2
 - VRM Add-on for Blender versions 2.20.54 through 4.4.0
 
 and supports both the VRM 0.x and 1.0 format. This addon has been tested using
-[VRoid's sample avatars](https://vroid.pixiv.help/hc/en-us/articles/4402394424089). If you're using an older version of
-Blender (2.x or 3.x), use [version 0.1.1](https://github.com/nanoskript/vrm-rigify/releases/tag/v0.1.1) of this addon.
+[VRoid's sample avatars](https://vroid.pixiv.help/hc/en-us/articles/4402394424089).
 
 This addon is designed for models authored in VRoid Studio or models that follow
 VRoid's bone naming conventions (`J_Bip_C_Chest`). Models with bone names that
