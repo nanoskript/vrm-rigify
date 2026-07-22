@@ -21,3 +21,6 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/')
         with:
           files: vrm_rigify.zip
+          # Tags with a suffix (e.g. v0.4.1-rc.1) publish as a pre-release so
+          # they never become the "latest" release; plain version tags do not.
+          prerelease: ${{ contains(github.ref_name, '-') }}
