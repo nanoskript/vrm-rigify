@@ -159,6 +159,19 @@ def remove_or_log_unmapped_metarig_bones(metarig: bpy.types.Object, bone_mapping
             armature_metarig.edit_bones.remove(metarig_bone)
 
 
+# Metarig bones for the arm and leg chains. Rigify's limb rigs depend on the
+# metarig's roll convention, so these are excluded from copying the model's roll.
+LIMB_CHAIN_PATTERN = r"^(upper_arm|forearm|hand|thigh|shin|foot|toe)\.(L|R)$"
+
+
+def align_edit_bone_roll_to_model(edit_bone: bpy.types.EditBone, model_bone: bpy.types.Bone):
+    # Point the edit bone's roll along the model bone's local Z axis. Every
+    # caller has already given the edit bone the model bone's head and tail and
+    # shares the model's world matrix, so the model bone's local axes carry over
+    # into the edit bone's space directly.
+    edit_bone.align_roll(model_bone.matrix_local.to_3x3() @ Vector((0.0, 0.0, 1.0)))
+
+
 def position_metarig_bones_to_vrm_model(metarig: bpy.types.Object, vrm_object: bpy.types.Object, bone_mapping):
     armature_metarig: bpy.types.Armature = metarig.data
     armature_vrm: bpy.types.Armature = vrm_object.data
@@ -172,6 +185,22 @@ def position_metarig_bones_to_vrm_model(metarig: bpy.types.Object, vrm_object: b
             metarig_bone.select = True
             metarig_bone.head = vrm_bone.head_local
             metarig_bone.tail = vrm_bone.tail_local
+
+            # Copy the model's bone roll onto the metarig. VRM models import
+            # with a clean, consistent roll on every bone, but the human
+            # metarig's default rolls are tuned for its own bone layout. Moving
+            # a metarig bone to the model without also copying its roll leaves
+            # the deform bone's local axes twisted relative to the model. This
+            # is most visible on the fingers: their bend axis ends up pointing
+            # out of the curl plane and drifts along each finger, which is what
+            # makes the generated rig's bone orientation look wrong.
+            #
+            # The arm and leg chains are the exception. Rigify's limb rigs bend
+            # the elbow and knee around the metarig's roll convention, so
+            # replacing it with the model's roll aims their IK out of the
+            # anatomical bend plane. Leave those chains on the metarig's roll.
+            if not re.match(LIMB_CHAIN_PATTERN, metarig_bone_name):
+                align_edit_bone_roll_to_model(metarig_bone, vrm_bone)
 
 
 def fix_position_of_metarig_spine_bones(metarig: bpy.types.Object, bone_mapping):
@@ -223,18 +252,58 @@ def remove_metarig_palm_bones(metarig: bpy.types.Object):
             edit_bones.remove(bone)
 
 
+FINGER_ROOT_PATTERNS = [
+    r"^f_pinky\.01\.(L|R)$",
+    r"^f_ring\.01\.(L|R)$",
+    r"^f_middle\.01\.(L|R)$",
+    r"^f_index\.01\.(L|R)$",
+    r"^thumb\.01\.(L|R)$",
+]
+
+
+def palm_normal_toward_palm(metarig: bpy.types.Object, pose_bones, side: str):
+    # Plane through the index, middle, and pinky knuckles, oriented to point
+    # toward the palm. Models rest with the palm facing down, so of the two
+    # plane normals the palm side is the one facing the ground. Returns None
+    # when the plane cannot be built: a hand missing one of these fingers, or
+    # knuckles that are collinear.
+    knuckles = []
+    for finger in ["f_index.01", "f_middle.01", "f_pinky.01"]:
+        bone = pose_bones.get(f"{finger}.{side}")
+        if bone is None:
+            return None
+        knuckles.append(metarig.matrix_world @ bone.bone.head_local)
+
+    normal = (knuckles[1] - knuckles[0]).cross(knuckles[2] - knuckles[0])
+    if normal.length == 0.0:
+        return None
+
+    normal.normalize()
+    return normal if normal.z < 0.0 else -normal
+
+
+def finger_primary_rotation_axis(metarig: bpy.types.Object, bone, palm_normal) -> str:
+    # The master control curls a finger around the local axis named here. A
+    # finger flexes toward the palm around the axis perpendicular to both the
+    # finger and the palm normal; rotating the finger positively about that
+    # axis moves its tip toward the palm. The finger bones carry the model's
+    # roll (see `position_metarig_bones_to_vrm_model`), and that roll differs
+    # between VRM versions, so the curl axis cannot be hardcoded: express the
+    # flex axis in the finger's own frame and pick the nearest signed local
+    # axis for Rigify's curl driver.
+    rotation = metarig.matrix_world.to_3x3()
+    finger_direction = (rotation @ (bone.bone.tail_local - bone.bone.head_local)).normalized()
+    flex_axis = finger_direction.cross(palm_normal).normalized()
+    local = (rotation @ bone.bone.matrix_local.to_3x3()).inverted() @ flex_axis
+    index = max(range(3), key=lambda i: abs(local[i]))
+    label = "XYZ"[index]
+    return label if local[index] > 0.0 else f"-{label}"
+
+
 def fix_metarig_limb_rotation_axes(metarig: bpy.types.Object):
     limb_bones = [
         r"^upper_arm\.(L|R)$",
         r"^thigh\.(L|R)$",
-    ]
-
-    finger_bones = [
-        r"^f_pinky\.01\.(L|R)$",
-        r"^f_ring\.01\.(L|R)$",
-        r"^f_middle\.01\.(L|R)$",
-        r"^f_index\.01\.(L|R)$",
-        r"^thumb\.01\.(L|R)$",
     ]
 
     pose_bones = metarig.pose.bones
@@ -244,10 +313,21 @@ def fix_metarig_limb_rotation_axes(metarig: bpy.types.Object):
         bone.rigify_parameters.rotation_axis = 'x'
 
     # Amend armature fingers.
-    for bone in objects_by_name_patterns(pose_bones, finger_bones):
-        print(f"amending bone parameters for finger '{bone.name}'")
-        # Ensure primary bend direction is correct.
-        axis = 'Z' if bone.name.endswith('L') else '-Z'
+    palm_normals = {side: palm_normal_toward_palm(metarig, pose_bones, side) for side in ["L", "R"]}
+    for bone in objects_by_name_patterns(pose_bones, FINGER_ROOT_PATTERNS):
+        palm_normal = palm_normals[bone.name[-1]]
+        if palm_normal is not None:
+            axis = finger_primary_rotation_axis(metarig, bone, palm_normal)
+            print(f"amending bone parameters for finger '{bone.name}' (curl axis {axis})")
+        else:
+            # Without a reliable palm plane (a hand missing one of the fingers
+            # it is built from) the curl axis cannot be derived from geometry.
+            # Fall back to a fixed per-side axis, which still keeps the model's
+            # roll on the finger, rather than leaving Rigify's default
+            # 'automatic' to re-roll the whole chain away from the model.
+            axis = 'Z' if bone.name.endswith('L') else '-Z'
+            print(f"no palm plane for finger '{bone.name}'; using fallback curl axis {axis}")
+
         bone.rigify_parameters.primary_rotation_axis = axis
 
 
@@ -333,6 +413,13 @@ def attach_unmapped_vrm_model_bones_to_rig(rig_object: bpy.types.Object, vrm_obj
             bone_in_rig.head = vrm_bone.head_local
             bone_in_rig.tail = vrm_bone.tail_local
             bone_in_rig.parent = parent_bone_in_rig
+
+            # Copy the model's bone roll onto the attached bone. A new edit bone
+            # defaults to zero roll, which matches VRM 0.x bones (they import at
+            # zero roll) but not VRM 1.0 bones, which can carry arbitrary rolls.
+            # Without this, secondary chains like hair and skirts come out
+            # twisted relative to the model on VRM 1.0 imports.
+            align_edit_bone_roll_to_model(bone_in_rig, vrm_bone)
 
             # Show the generated bone alongside its parent.
             inherit_bone_groupings(bone_in_rig, parent_bone_in_rig)

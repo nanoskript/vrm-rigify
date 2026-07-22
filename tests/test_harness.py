@@ -203,6 +203,151 @@ def check_eye_bones_at_rest(rig_object: bpy.types.Object, vrm_object: bpy.types.
             f"eye bone '{bone_name}' is rotated {angle:.1f} degrees at rest"
 
 
+def check_bone_orientation_matches_model(rig_object: bpy.types.Object, vrm_object: bpy.types.Object):
+    # Deform bones must keep the model's bone roll or their local axes come out
+    # twisted relative to the model. That twist is what makes finger bend axes
+    # point out of the curl plane and secondary chains (hair, skirts) look wrong,
+    # most visibly on VRM 1.0 imports where bones carry non-zero rolls. Two sets
+    # are exempt: the arm and leg chains, which keep the metarig's roll because
+    # Rigify's limb rigs bend around it, and the eye bones, which are pointed
+    # forward for the eye rig. Roll is only exposed on edit bones.
+    human_bones = vrm_object.data.vrm_addon_extension.vrm1.humanoid.human_bones
+    exempt_keys = [
+        "left_eye", "right_eye",
+        "left_upper_arm", "left_lower_arm", "left_hand",
+        "right_upper_arm", "right_lower_arm", "right_hand",
+        "left_upper_leg", "left_lower_leg", "left_foot", "left_toes",
+        "right_upper_leg", "right_lower_leg", "right_foot", "right_toes",
+    ]
+    exempt = set()
+    for key in exempt_keys:
+        human_bone = getattr(human_bones, key, None)
+        if human_bone and human_bone.node.bone_name:
+            exempt.add(human_bone.node.bone_name)
+
+    def edit_bone_rolls(obj: bpy.types.Object) -> dict[str, float]:
+        previous = bpy.context.view_layer.objects.active
+        obj.hide_set(False)
+        bpy.context.view_layer.objects.active = obj
+        bpy.ops.object.mode_set(mode="EDIT")
+        rolls = {edit_bone.name: edit_bone.roll for edit_bone in obj.data.edit_bones}
+        bpy.ops.object.mode_set(mode="OBJECT")
+        bpy.context.view_layer.objects.active = previous
+        return rolls
+
+    vrm_rolls = edit_bone_rolls(vrm_object)
+    rig_rolls = edit_bone_rolls(rig_object)
+    twisted = []
+    for name, rig_roll in rig_rolls.items():
+        if name in exempt or name not in vrm_rolls:
+            continue
+        if not rig_object.data.bones[name].use_deform:
+            continue
+
+        diff = abs(degrees(rig_roll - vrm_rolls[name])) % 360.0
+        diff = min(diff, 360.0 - diff)
+        if diff > 1.0:
+            twisted.append(f"{name} ({diff:.0f} deg)")
+
+    assert not twisted, \
+        f"deform bones are twisted relative to the model: {sorted(twisted)}"
+
+
+def check_finger_curl_flexes_toward_palm(rig_object: bpy.types.Object, vrm_object: bpy.types.Object):
+    # Scaling a finger master control curls the finger around its bend axis
+    # (primary_rotation_axis). The curl must flex each finger toward the palm,
+    # not splay it sideways or bend it backward, which happens when the bend
+    # axis does not match the model's bone roll. Every finger, including the
+    # thumb, is checked on both hands.
+    human_bones = vrm_object.data.vrm_addon_extension.vrm1.humanoid.human_bones
+
+    def bone_name(key: str) -> str:
+        human_bone = getattr(human_bones, key, None)
+        return human_bone.node.bone_name if human_bone else ""
+
+    def head_world(name: str):
+        return rig_object.matrix_world @ rig_object.pose.bones[name].bone.head_local
+
+    def curl_toward_palm(master: str, proximal: str, distal: str, back_normal) -> float:
+        # Runs in pose mode with a clean pose. Curls one finger by scaling its
+        # master control, then leaves the pose clean again for the next finger.
+        tip = rig_object.pose.bones[distal]
+        finger_axis = ((rig_object.matrix_world @ tip.tail)
+                       - (rig_object.matrix_world @ rig_object.pose.bones[proximal].head)).normalized()
+        rest_tip = rig_object.matrix_world @ tip.tail
+        master_bone = rig_object.pose.bones[master]
+        master_bone.scale.y = 0.82  # a gentle curl
+        bpy.context.view_layer.update()
+        displacement = (rig_object.matrix_world @ tip.tail) - rest_tip
+        master_bone.matrix_basis.identity()
+        bpy.context.view_layer.update()
+
+        # Ignore the component along the finger (it folds back as it curls) and
+        # check the remaining motion heads to the palm side, not the back.
+        across = displacement - displacement.dot(finger_axis) * finger_axis
+        return -across.dot(back_normal)
+
+    # (control master base, VRM humanoid finger name). The thumb's control base
+    # lacks the 'f_' prefix and the pinky's VRM name is "little".
+    fingers = [
+        ("index", "f_index.01", "index"),
+        ("middle", "f_middle.01", "middle"),
+        ("ring", "f_ring.01", "ring"),
+        ("pinky", "f_pinky.01", "little"),
+        ("thumb", "thumb.01", "thumb"),
+    ]
+
+    # The "back of the hand" side is derived from the body's own up axis
+    # (hips to head) rather than world up, so this check does not share the
+    # addon's palm-down assumption and can catch a curl axis that the addon
+    # signed the wrong way.
+    hips, head = bone_name("hips"), bone_name("head")
+    body_up = Vector((0.0, 0.0, 1.0))
+    if hips in rig_object.pose.bones and head in rig_object.pose.bones:
+        spine = head_world(head) - head_world(hips)
+        if spine.length > 0.0:
+            body_up = spine.normalized()
+
+    tested = 0
+    bpy.context.view_layer.objects.active = rig_object
+    bpy.ops.object.mode_set(mode="POSE")
+    try:
+        for bone in rig_object.pose.bones:
+            bone.matrix_basis.identity()
+        bpy.context.view_layer.update()
+
+        for side_word, side in [("left", "L"), ("right", "R")]:
+            proximal = bone_name(f"{side_word}_index_proximal")
+            middle = bone_name(f"{side_word}_middle_proximal")
+            little = bone_name(f"{side_word}_little_proximal")
+            if not all(n and n in rig_object.pose.bones for n in [proximal, middle, little]):
+                continue
+
+            # The three knuckles define the palm plane; sign its normal to point
+            # to the back of the hand.
+            back_normal = (head_world(middle) - head_world(proximal)).cross(
+                head_world(little) - head_world(proximal)).normalized()
+            if back_normal.dot(body_up) < 0.0:
+                back_normal = -back_normal
+
+            for label, master_base, vrm_name in fingers:
+                master = f"{master_base}_master.{side}"
+                finger_proximal = bone_name(f"{side_word}_{vrm_name}_proximal")
+                finger_distal = bone_name(f"{side_word}_{vrm_name}_distal")
+                names = [finger_proximal, finger_distal]
+                if master not in rig_object.pose.bones or not all(n and n in rig_object.pose.bones for n in names):
+                    continue
+
+                toward_palm = curl_toward_palm(master, finger_proximal, finger_distal, back_normal)
+                assert toward_palm > 0.005, \
+                    f"{side_word} {label} finger curls away from the palm (toward_palm={toward_palm:.4f})"
+                tested += 1
+    finally:
+        bpy.ops.object.mode_set(mode="OBJECT")
+
+    assert tested > 0, "no finger master controls found to test finger curl"
+
+
 def check_shape_key_controls(rig_object: bpy.types.Object, vrm_object: bpy.types.Object):
     rig_extension = rig_object.data.vrm_addon_extension
     vrm_extension = vrm_object.data.vrm_addon_extension
@@ -249,6 +394,8 @@ def main():
     check_control_widget_sizes(rig_object, vrm_object)
     check_eye_bones_at_rest(rig_object, vrm_object)
     check_shape_key_controls(rig_object, vrm_object)
+    check_bone_orientation_matches_model(rig_object, vrm_object)
+    check_finger_curl_flexes_toward_palm(rig_object, vrm_object)
 
     print(f"model '{os.path.basename(model_path)}' passed all checks")
 
